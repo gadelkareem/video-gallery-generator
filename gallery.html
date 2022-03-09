@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="author" href="//github.com/gadelkareem/video-gallery-generator">
+    <meta name="description" content="Video Gallery generator">
+    <title>Video Gallery</title>
+    <script src="//cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.js"></script>
+    <script src="vars.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #333;
+        }
+
+        header {
+            padding: 0;
+            font-size: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 200px);
+            grid-gap: .5vw
+        }
+
+        header div img {
+            max-width: 200px;
+            height: auto;
+            max-height: 130px;
+        }
+
+        header div {
+            margin: 0;
+        }
+
+    </style>
+</head>
+<body>
+<header style="text-align: center" id="gallery">
+</header>
+<script>
+    files.forEach(function (path) {
+        const filename = path.split('/').pop()
+        const dir = path.split('/').slice(0, -1).join('/')
+        const video = $('<div><a href="' + filename + '" target="_blank"><img alt="' + filename + '" src="thumbs/' + filename + '.png" /></a></div>')
+
+        $('#gallery').append(video)
+    });
+</script>
+</body>
+</html>
