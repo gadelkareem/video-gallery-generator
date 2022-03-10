@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,10 +24,10 @@ func main() {
 	flag.Parse()
 
 	fs := listFiles(*d)
-	if *generate {
-		generateThumbs(*d, fs)
-	}
 	writeVars(*d, fs)
+	if *generate {
+		go generateThumbs(*d, fs)
+	}
 	http.Handle("/", http.FileServer(http.Dir(*d)))
 
 	log.Printf("Serving %s on HTTP port: http://0.0.0.0:%s\n", *d, *port)
@@ -34,16 +35,19 @@ func main() {
 }
 
 func listFiles(d string) []string {
-	files, err := ioutil.ReadDir(d)
-	if err != nil {
-		log.Fatal(err)
-	}
 	var fs []string
-	for _, f := range files {
+	e := filepath.Walk(d, func(p string, f os.FileInfo, err error) error {
+		if err != nil {
+			log.Fatal(err)
+		}
 		r, err := regexp.MatchString("(?i)\\.(mp4|mov|mpg|mpeg|avi)$", f.Name())
 		if err == nil && r {
-			fs = append(fs, path.Join(d, f.Name()))
+			fs = append(fs, p)
 		}
+		return err
+	})
+	if e != nil {
+		log.Fatal(e)
 	}
 	//log.Printf("%v", fs)
 
@@ -60,7 +64,7 @@ func generateThumbs(d string, fs []string) {
 			log.Printf("Thumbnail already exists for %s\n", f)
 			continue
 		}
-		cmd := fmt.Sprintf("ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 %s", f)
+		cmd := fmt.Sprintf("ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 '%s'", f)
 		//log.Printf("%s\n", cmd)
 		b, err := exec.Command("/bin/bash", "-c", cmd).Output()
 		if err != nil {
@@ -81,6 +85,9 @@ func generateThumbs(d string, fs []string) {
 
 func writeVars(d string, fs []string) {
 	log.Printf("Generating Video List")
+	for i, _ := range fs {
+		fs[i] = strings.Replace(fs[i], d+"/", "", 1)
+	}
 	lj, err := json.Marshal(fs)
 	if err != nil {
 		log.Fatal(err)
