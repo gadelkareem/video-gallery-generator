@@ -21,6 +21,8 @@ import (
 //go:embed gallery.html
 var html string
 
+var maxConcurrency = flag.Int64("c", 2, "Maximum number of generators to run concurrently")
+
 func main() {
 	port := flag.String("p", "8282", "port to serve on")
 	d := flag.String("d", ".", "static file folder")
@@ -65,7 +67,7 @@ func generateThumbs(d string, fs []string) {
 		log.Fatal(err)
 	}
 
-	wg := h.NewWgExec(3)
+	wg := h.NewWgExec(*maxConcurrency)
 	for _, f := range fs {
 		wg.Run(createThumb, thumbsDir, f)
 	}
@@ -90,7 +92,7 @@ func createThumb(ps ...interface{}) {
 	s := strings.TrimSuffix(string(b), "\n")
 	//log.Printf("Video has %s seconds\n", s)
 	numSec, _ := strconv.ParseFloat(s, 64)
-	log.Printf("%f seconds in '%s'\n", numSec, f)
+	//log.Printf("%f seconds in '%s'\n", numSec, f)
 	cmd = fmt.Sprintf("ffmpeg -y -i '%s' -vf scale=220:-1 -vframes 1 -ss %f '%s'", f, numSec/2, thumb)
 	//log.Printf("%s\n", cmd)
 	err = exec.Command("/bin/bash", "-c", cmd).Run()

@@ -5,6 +5,9 @@ The command line application generates thumbnails for videos and run the builtin
 - Check the [releases](https://github.com/gadelkareem/video-gallery-generator/releases) page for executable versions.
 - By default, the application will only run the server on http://0.0.0.0:8282/. To generate thumbnails for all videos in a directory, use the `-g` option.
 
+# Prerequisites
+- FFmpeg installed on your system. Download [here](https://ffmpeg.org/download.html).
+
 # Usage
 ```bash
 # Run the server using current directory as the root directory
@@ -13,6 +16,8 @@ The command line application generates thumbnails for videos and run the builtin
 ./vgg-darwin-arm64 -g
 # Run the server using a specific path as the root directory and different port
 ./vgg-darwin-arm64 -d /path/to/videos -p 8080
+# Control the maximum number of generators to run concurrently
+./vgg-darwin-arm64 -g -c 10
 ```
 
 # Build for all platforms
