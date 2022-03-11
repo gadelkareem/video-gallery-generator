@@ -40,8 +40,7 @@
 </header>
 <script>
     files.forEach(function (p) {
-        p.replace(/%2F/g, '%2_F');
-        p = encodeURIComponent(p).replace(/%2F/g, "/").replace(/%2_F/g, '%2F')
+        p = encodeURIComponent(p.replace(/%2F/g, '%2_F')).replace(/%2F/g, "/").replace(/%2_F/g, '%2F')
         const filename = p.split('/').pop()
         const video = $('<div><a href="' + p + '" target="_blank"><img alt="' + filename + '" src="thumbs/' + filename + '.png" /></a></div>')
 
