@@ -7,6 +7,7 @@ The command line application generates thumbnails for videos and run the builtin
 
 # Prerequisites
 - FFmpeg installed on your system. Download [here](https://ffmpeg.org/download.html).
+- Python 2.7 installed (only in case of using spatial media flag `-s`). More info [here](https://github.com/google/spatial-media).
 
 # Usage
 ```bash
@@ -18,6 +19,8 @@ The command line application generates thumbnails for videos and run the builtin
 ./vgg-darwin-arm64 -d /path/to/videos -p 8080
 # Control the maximum number of generators to run concurrently
 ./vgg-darwin-arm64 -g -c 10
+# Add spatial media metadata to videos. This will rename the videos and add '_180x180_3dh' suffix to the video file name. Only left-right 180 is currently supported. 
+./vgg-darwin-arm64 -s
 ```
 
 # Build for all platforms
