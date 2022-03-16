@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	_ "embed"
 	"encoding/json"
 	"flag"
@@ -27,9 +28,14 @@ func main() {
 	port := flag.String("p", "8282", "port to serve on")
 	d := flag.String("d", ".", "static file folder")
 	generate := flag.Bool("g", false, "generate thumbnails")
+	spatialMedia := flag.Bool("s", false, "add spatial media metadata")
 	flag.Parse()
 
 	fs := listFiles(*d)
+	if *spatialMedia {
+		addSpatialMedias(*d, fs)
+	}
+	fs = listFiles(*d)
 	writeVars(*d, fs)
 	if *generate {
 		go generateThumbs(*d, fs)
@@ -60,6 +66,112 @@ func listFiles(d string) []string {
 	return fs
 }
 
+func addSpatialMedias(d string, fs []string) {
+	tmpdir := "tmp"
+	smPath := path.Join(tmpdir, "spatial-media")
+	if !h.FileExists(smPath) {
+		err := os.MkdirAll(tmpdir, os.ModePerm)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = downloadFile("https://github.com/google/spatial-media/archive/refs/tags/v2.1.zip", "spatial-media.zip")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = unzip("spatial-media.zip", "tmp", os.ModePerm)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = os.Remove("spatial-media.zip")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = os.Rename(path.Join(tmpdir, "spatial-media-2.1"), smPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	wg := h.NewWgExec(*maxConcurrency)
+	for _, f := range fs {
+		wg.Run(addSpatialMedia, d, f, smPath)
+	}
+	wg.Wait()
+}
+
+func addSpatialMedia(ps ...interface{}) {
+	of := ps[1].(string)
+	smPath := ps[2].(string)
+	ext := path.Ext(of)
+	format := "_180x180_3dh"
+	if strings.HasSuffix(of, format+ext) {
+		return
+	}
+	//log.Printf("Adding spatial media metadata to %s\n", of)
+	f := fmt.Sprintf("%s%s%s", strings.TrimSuffix(of, ext), format, ext)
+	cmd := fmt.Sprintf("python2.7 %s/spatialmedia -i -s left-right '%s' '%s'", smPath, of, f)
+	//log.Printf("%s\n", cmd)
+	b, err := exec.Command("/bin/bash", "-c", cmd).Output()
+	if err != nil {
+		log.Printf("Error writing spatial media metadata %s, Error: %v Output %s\n", f, err, b)
+	} else {
+		e := os.Remove(of)
+		if e != nil {
+			log.Fatal(e)
+		}
+	}
+	log.Printf("Updated spatial media for %s\n", f)
+}
+
+func downloadFile(u, dest string) error {
+	b, err := h.GetUrl(u)
+	if err != nil {
+		return err
+	}
+	out, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = out.Write(b)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func unzip(source, dest string, prem os.FileMode) error {
+	read, err := zip.OpenReader(source)
+	if err != nil {
+		return err
+	}
+	defer read.Close()
+	for _, file := range read.File {
+		if file.Mode().IsDir() {
+			continue
+		}
+		open, err := file.Open()
+		if err != nil {
+			return err
+		}
+		name := path.Join(dest, file.Name)
+		err = os.MkdirAll(path.Dir(name), prem)
+		if err != nil {
+			return err
+		}
+		create, err := os.Create(name)
+		if err != nil {
+			return err
+		}
+		defer create.Close()
+		_, err = create.ReadFrom(open)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func generateThumbs(d string, fs []string) {
 	thumbsDir := path.Join(d, "thumbs")
 	err := os.MkdirAll(thumbsDir, os.ModePerm)
@@ -77,12 +189,12 @@ func generateThumbs(d string, fs []string) {
 func createThumb(ps ...interface{}) {
 	thumbsDir := ps[0].(string)
 	f := ps[1].(string)
-	log.Printf("Generating thumbnail for %s\n", f)
 	thumb := path.Join(thumbsDir, path.Base(f)+".png")
 	if h.FileExists(thumb) {
 		log.Printf("Thumbnail already exists for %s\n", f)
 		return
 	}
+	log.Printf("Generating thumbnail for %s\n", f)
 	cmd := fmt.Sprintf("ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 '%s'", f)
 	//log.Printf("%s\n", cmd)
 	b, err := exec.Command("/bin/bash", "-c", cmd).Output()

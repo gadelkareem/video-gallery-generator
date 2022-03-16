@@ -46,6 +46,9 @@
 
         $('#gallery').append(video)
     });
+    $("img").on("error", function () {
+        $(this).attr("src", "https://cdn.jsdelivr.net/npm/@internetarchive/icon-video@1.3.2/video.svg");
+    });
 </script>
 </body>
 </html>
