@@ -28,14 +28,19 @@ func main() {
 	port := flag.String("p", "8282", "port to serve on")
 	d := flag.String("d", ".", "static file folder")
 	generate := flag.Bool("g", false, "generate thumbnails")
+	rename := flag.Bool("r", false, "rename files and add _180x180_3dh suffix")
 	spatialMedia := flag.Bool("s", false, "add spatial media metadata")
 	flag.Parse()
 
 	fs := listFiles(*d)
+	if *rename {
+		renameFiles(fs)
+		fs = listFiles(*d)
+	}
 	if *spatialMedia {
 		addSpatialMedias(*d, fs)
+		fs = listFiles(*d)
 	}
-	fs = listFiles(*d)
 	writeVars(*d, fs)
 	if *generate {
 		go generateThumbs(*d, fs)
@@ -64,6 +69,37 @@ func listFiles(d string) []string {
 	//log.Printf("%v", fs)
 
 	return fs
+}
+
+func renameFiles(fs []string) {
+	wg := h.NewWgExec(*maxConcurrency)
+	for _, f := range fs {
+		wg.Run(rename, f)
+	}
+	wg.Wait()
+	log.Printf("Renamed %d files\n", len(fs))
+}
+
+func rename(ps ...interface{}) {
+	of := ps[0].(string)
+	f := newName(of)
+	if f == "" {
+		return
+	}
+	err := os.Rename(of, f)
+	if err != nil {
+		log.Printf("Error renaming %s to %s: %v", of, f, err)
+	}
+	log.Printf("Renamed %s to %s", of, f)
+}
+
+func newName(f string) string {
+	ext := path.Ext(f)
+	format := "_180x180_3dh"
+	if strings.HasSuffix(f, format+ext) {
+		return ""
+	}
+	return fmt.Sprintf("%s%s%s", strings.TrimSuffix(f, ext), format, ext)
 }
 
 func addSpatialMedias(d string, fs []string) {
@@ -96,18 +132,17 @@ func addSpatialMedias(d string, fs []string) {
 		wg.Run(addSpatialMedia, d, f, smPath)
 	}
 	wg.Wait()
+	log.Printf("Spatial media added to %v files", len(fs))
 }
 
 func addSpatialMedia(ps ...interface{}) {
 	of := ps[1].(string)
 	smPath := ps[2].(string)
-	ext := path.Ext(of)
-	format := "_180x180_3dh"
-	if strings.HasSuffix(of, format+ext) {
+	f := newName(of)
+	if f == "" {
 		return
 	}
 	//log.Printf("Adding spatial media metadata to %s\n", of)
-	f := fmt.Sprintf("%s%s%s", strings.TrimSuffix(of, ext), format, ext)
 	cmd := fmt.Sprintf("python2.7 %s/spatialmedia -i -s left-right '%s' '%s'", smPath, of, f)
 	//log.Printf("%s\n", cmd)
 	b, err := exec.Command("/bin/bash", "-c", cmd).Output()
@@ -184,6 +219,24 @@ func generateThumbs(d string, fs []string) {
 		wg.Run(createThumb, thumbsDir, f)
 	}
 	wg.Wait()
+	thumbs, err := os.ReadDir(thumbsDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+thumbs:
+	for _, t := range thumbs {
+		for _, f := range fs {
+			if path.Base(f) == strings.TrimSuffix(t.Name(), ".png") {
+				continue thumbs
+			}
+		}
+		err = os.Remove(path.Join(thumbsDir, t.Name()))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	log.Printf("Thumbnail generated for %v files", len(fs))
 }
 
 func createThumb(ps ...interface{}) {
@@ -191,7 +244,7 @@ func createThumb(ps ...interface{}) {
 	f := ps[1].(string)
 	thumb := path.Join(thumbsDir, path.Base(f)+".png")
 	if h.FileExists(thumb) {
-		log.Printf("Thumbnail already exists for %s\n", f)
+		//log.Printf("Thumbnail already exists for %s\n", f)
 		return
 	}
 	log.Printf("Generating thumbnail for %s\n", f)
@@ -214,7 +267,7 @@ func createThumb(ps ...interface{}) {
 }
 
 func writeVars(d string, fs []string) {
-	log.Printf("Generating Video List")
+	//log.Printf("Generating Video List")
 	var fss []string
 	d = strings.TrimSuffix(d, "/") + "/"
 	for i, _ := range fs {

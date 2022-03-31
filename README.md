@@ -21,6 +21,8 @@ The command line application generates thumbnails for videos and run the builtin
 ./vgg-darwin-arm64 -g -c 10
 # Add spatial media metadata to videos. This will rename the videos and add '_180x180_3dh' suffix to the video file name. Only left-right 180 is currently supported. 
 ./vgg-darwin-arm64 -s
+# This will rename the videos and add '_180x180_3dh' suffix to the video file name without adding spatial media metadata. Only left-right 180 is currently supported.  
+./vgg-darwin-arm64 -r
 ```
 
 # Build for all platforms
